@@ -1,0 +1,19 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Segredos - nunca versionar valores reais, só o template .example
+*.auto.tfvars
+*.auto.tfvars.json
+*.tfvars
+!*secrets.auto.tfvars.example
+
+# Arquivos para auxílio da elaboração do projeto
+/docs
