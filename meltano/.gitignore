@@ -2,3 +2,5 @@
 /.meltano
 .env
 /data
+validate.py
+banvic_validation.duckdb

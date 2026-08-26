@@ -16,8 +16,11 @@ plugins:
   loaders:
   - name: target-s3
     variant: crowemi
-    pip_url: git+https://github.com/crowemi/target-s3.git
+    pip_url: git+https://github.com/crowemi/target-s3.git "setuptools<81"
+    python: '3.11'
     config:
+      prefix: banvic
+      append_date_to_filename_grain: microsecond
       cloud_provider:
         cloud_provider_type: aws
         aws:
@@ -28,6 +31,9 @@ plugins:
           aws_endpoint_override: http://localhost:9000
       format:
         format_type: parquet
+        format_parquet:
+          validate: true
+      max_batch_size: 30000
   - name: target-jsonl
     variant: andyh1203
     pip_url: target-jsonl
