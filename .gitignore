@@ -17,3 +17,6 @@ override.tf.json
 
 # Arquivos para auxílio da elaboração do projeto
 /docs
+
+# Meltano
+.venv

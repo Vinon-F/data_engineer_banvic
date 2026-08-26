@@ -1,0 +1,33 @@
+default_environment: dev
+project_id: 01a03ac6-7eb7-7f52-9135-64833311a397
+environments:
+- name: dev
+- name: staging
+- name: prod
+plugins:
+  extractors:
+  - name: tap-csv
+    variant: meltanolabs
+    pip_url: git+https://github.com/MeltanoLabs/tap-csv.git
+    config:
+      csv_files_definition: files_def.json
+    select:
+    - '*.*'
+  loaders:
+  - name: target-s3
+    variant: crowemi
+    pip_url: git+https://github.com/crowemi/target-s3.git
+    config:
+      cloud_provider:
+        cloud_provider_type: aws
+        aws:
+          aws_access_key_id: ${MINIO_ACCESS_KEY}
+          aws_secret_access_key: ${MINIO_SECRET_KEY}
+          aws_region: us-east-1
+          aws_bucket: raw
+          aws_endpoint_override: http://localhost:9000
+      format:
+        format_type: parquet
+  - name: target-jsonl
+    variant: andyh1203
+    pip_url: target-jsonl
