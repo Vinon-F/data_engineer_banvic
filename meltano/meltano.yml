@@ -28,7 +28,7 @@ plugins:
           aws_secret_access_key: ${MINIO_SECRET_KEY}
           aws_region: us-east-1
           aws_bucket: raw
-          aws_endpoint_override: http://localhost:9000
+          aws_endpoint_override: ${MINIO_ENDPOINT}
       format:
         format_type: parquet
         format_parquet:

@@ -4,6 +4,23 @@ resource "kubernetes_namespace" "airflow" {
   }
 }
 
+locals {
+  # Volume/mount do ConfigMap com as DAGs (kubernetes_config_map.dags, em
+  # dags.tf), montado nos 3 componentes que precisam enxergar dags/:
+  # dagProcessor (parseia), apiServer (aba "Code" da UI) e scheduler (o
+  # LocalExecutor roda as tasks no próprio pod do scheduler).
+  dags_volume = {
+    name = "dags"
+    configMap = {
+      name = kubernetes_config_map.dags.metadata[0].name
+    }
+  }
+  dags_volume_mount = {
+    name      = "dags"
+    mountPath = "/opt/airflow/dags"
+  }
+}
+
 resource "helm_release" "airflow" {
   name             = "airflow"
   repository       = "https://airflow.apache.org"
@@ -79,6 +96,8 @@ resource "helm_release" "airflow" {
             memory = "1Gi"
           }
         }
+        extraVolumes      = [local.dags_volume]
+        extraVolumeMounts = [local.dags_volume_mount]
       }
 
       dagProcessor = {
@@ -92,6 +111,8 @@ resource "helm_release" "airflow" {
             memory = "512Mi"
           }
         }
+        extraVolumes      = [local.dags_volume]
+        extraVolumeMounts = [local.dags_volume_mount]
       }
 
       scheduler = {
@@ -105,6 +126,8 @@ resource "helm_release" "airflow" {
             memory = "1Gi"
           }
         }
+        extraVolumes      = [local.dags_volume]
+        extraVolumeMounts = [local.dags_volume_mount]
       }
 
       postgresql = {

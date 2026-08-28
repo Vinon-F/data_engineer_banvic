@@ -11,8 +11,12 @@ module "airflow" {
   admin_password = var.airflow_admin_password
   fernet_key     = var.airflow_fernet_key
 
-  # Não é uma dependência real de infraestrutura (nenhum output do MinIO
-  # alimenta o Airflow) - só ordena o apply para um log mais legível na demo.
-  # A dependência real (DAGs lendo do MinIO) é em nível de aplicação/runtime.
+  # Credenciais do MinIO repassadas como Secret para o Pod do Meltano
+  # (KubernetesPodOperator, ver dags/banvic_meltano_dag.py) - esta sim é uma
+  # dependência real: o endpoint interno só existe depois do MinIO instalado.
+  minio_endpoint   = "http://${module.minio.internal_endpoint}"
+  minio_access_key = var.minio_root_user
+  minio_secret_key = var.minio_root_password
+
   depends_on = [module.minio]
 }
