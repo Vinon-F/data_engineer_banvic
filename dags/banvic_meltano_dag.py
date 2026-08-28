@@ -31,7 +31,7 @@ with DAG(
         task_id="run_meltano_tap_csv_target_s3",
         name="banvic-meltano",
         namespace="airflow",
-        image="banvic-meltano:latest",
+        image="banvic-meltano:v1.0",
         image_pull_policy="IfNotPresent",
         # Usa o ENTRYPOINT/CMD default da imagem (descompacta o .zip e roda
         # `meltano run tap-csv target-s3`); explicitado aqui só para clareza.
