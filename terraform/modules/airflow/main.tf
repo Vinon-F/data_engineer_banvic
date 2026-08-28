@@ -5,19 +5,16 @@ resource "kubernetes_namespace" "airflow" {
 }
 
 locals {
-  # Volume/mount do ConfigMap com as DAGs (kubernetes_config_map.dags, em
-  # dags.tf), montado nos 3 componentes que precisam enxergar dags/:
-  # dagProcessor (parseia), apiServer (aba "Code" da UI) e scheduler (o
-  # LocalExecutor roda as tasks no próprio pod do scheduler).
+  # Volume do ConfigMap com as DAGs (kubernetes_config_map.dags e
+  # local.dags_volume_mounts/dags_checksum, ambos em dags.tf), montado nos 3
+  # componentes que precisam enxergar dags/: dagProcessor (parseia),
+  # apiServer (aba "Code" da UI) e scheduler (o LocalExecutor roda as tasks
+  # no próprio pod do scheduler).
   dags_volume = {
     name = "dags"
     configMap = {
       name = kubernetes_config_map.dags.metadata[0].name
     }
-  }
-  dags_volume_mount = {
-    name      = "dags"
-    mountPath = "/opt/airflow/dags"
   }
 }
 
@@ -97,7 +94,10 @@ resource "helm_release" "airflow" {
           }
         }
         extraVolumes      = [local.dags_volume]
-        extraVolumeMounts = [local.dags_volume_mount]
+        extraVolumeMounts = local.dags_volume_mounts
+        podAnnotations = {
+          "checksum/dags" = local.dags_checksum
+        }
       }
 
       dagProcessor = {
@@ -112,7 +112,10 @@ resource "helm_release" "airflow" {
           }
         }
         extraVolumes      = [local.dags_volume]
-        extraVolumeMounts = [local.dags_volume_mount]
+        extraVolumeMounts = local.dags_volume_mounts
+        podAnnotations = {
+          "checksum/dags" = local.dags_checksum
+        }
       }
 
       scheduler = {
@@ -127,7 +130,10 @@ resource "helm_release" "airflow" {
           }
         }
         extraVolumes      = [local.dags_volume]
-        extraVolumeMounts = [local.dags_volume_mount]
+        extraVolumeMounts = local.dags_volume_mounts
+        podAnnotations = {
+          "checksum/dags" = local.dags_checksum
+        }
       }
 
       postgresql = {
