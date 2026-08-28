@@ -26,3 +26,10 @@ kubectl port-forward -n minio svc/minio-console 9001:9001 & kubectl port-forward
 
 - MinIO console: http://localhost:9001 (usuário/senha = `minio_root_user`/`minio_root_password` do `secrets.auto.tfvars`)
 - Airflow UI: http://localhost:8080 (usuário/senha = `admin`/`airflow_admin_password` do `secrets.auto.tfvars`)
+
+```bash
+minikube minikube mount "$(git rev-parse --show-toplevel)/banvic_data:/mnt/banvic_data" -p banvic &
+minikube kubectl -p banvic -- port-forward -n minio svc/minio-console 9001:9001 &
+minikube kubectl -p banvic -- port-forward -n airflow svc/airflow-api-server 8080:8080 &
+wait
+```
