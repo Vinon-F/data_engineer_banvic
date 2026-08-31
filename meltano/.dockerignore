@@ -1,11 +1,11 @@
-# Ambientes/venvs locais (recriados dentro da imagem via `meltano install`)
+# Ambiente local
 venv
 .meltano
 
-# Nunca deve entrar na imagem - credenciais são injetadas em runtime
+# Credenciais
 .env
 
-# Estado local (gerado em runtime dentro do container, não faz parte da imagem)
+# Arquivos de teste
 data
 output
 banvic_validation.duckdb

@@ -12,23 +12,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Cria os venvs dos plugins (tap-csv, target-s3, target-jsonl) em build time,
-# para não depender de rede/pip/github no runtime do container.
 RUN meltano install
-
-COPY entrypoint.sh /entrypoint.sh
+# entrpoint.sh faz o unzip dos csvs no container para 'data/csvs'
+COPY entrypoint.sh /entrypoint.sh   
 RUN chmod +x /entrypoint.sh
 
-# BANVIC_DATA_DIR: pasta com o .zip de origem, MONTADA em runtime pela
-# orquestração (docker run -v, ou um volume/PVC do Kubernetes referenciado no
-# Pod que o Airflow disparar) - nunca copiada pra dentro da imagem. O valor
-# abaixo é só o default, sobrescrevível via -e/env do Pod se o caminho
-# montado mudar.
 ENV BANVIC_DATA_DIR=/data/banvic_data
 
-# Idem para as credenciais do MinIO: nenhuma é definida aqui. São lidas via
-# ${} em meltano.yml e devem ser injetadas em runtime (docker run -e,
-# --env-file, ou um Secret do Kubernetes referenciado no Pod do Airflow).
+ENTRYPOINT ["/entrypoint.sh"] 
 
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["run", "tap-csv", "target-s3"]

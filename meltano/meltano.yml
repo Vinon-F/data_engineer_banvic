@@ -10,7 +10,7 @@ plugins:
     variant: meltanolabs
     pip_url: git+https://github.com/MeltanoLabs/tap-csv.git
     config:
-      csv_files_definition: files_def.json
+      csv_files_definition: files_def.json # Arquivo Json com o schema das tabelas para o extractor.
     select:
     - '*.*'
   loaders:

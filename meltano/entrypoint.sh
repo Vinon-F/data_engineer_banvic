@@ -1,9 +1,7 @@
 #!/bin/sh
 set -eu
 
-# BANVIC_DATA_DIR aponta pra uma pasta MONTADA em runtime (não copiada na
-# imagem) contendo o .zip de origem. Ajustável na orquestração do pipeline
-# via env var, sem precisar rebuildar a imagem.
+# BANVIC_DATA_DIR aponta pra uma pasta MONTADA em runtime contendo o .zip de origem.
 zip_file=$(find "$BANVIC_DATA_DIR" -maxdepth 1 -iname '*.zip' | head -n 1)
 
 if [ -z "$zip_file" ]; then
