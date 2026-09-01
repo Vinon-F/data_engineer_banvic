@@ -1,8 +1,9 @@
-module "minio" {
-  source = "./modules/minio"
+module "postgres" {
+  source = "./modules/postgres"
 
-  root_user     = var.minio_root_user
-  root_password = var.minio_root_password
+  postgres_user     = var.postgres_user
+  postgres_password = var.postgres_password
+  postgres_db       = var.postgres_db
 }
 
 module "airflow" {
@@ -11,12 +12,15 @@ module "airflow" {
   admin_password = var.airflow_admin_password
   fernet_key     = var.airflow_fernet_key
 
-  # Credenciais do MinIO repassadas como Secret para o Pod do Meltano
-  # (KubernetesPodOperator, ver dags/banvic_meltano_dag.py) - esta sim é uma
-  # dependência real: o endpoint interno só existe depois do MinIO instalado.
-  minio_endpoint   = "http://${module.minio.internal_endpoint}"
-  minio_access_key = var.minio_root_user
-  minio_secret_key = var.minio_root_password
+  # Conexão com o PostgreSQL de destino, repassada como Secret para:
+  #  - o Pod do Meltano (KubernetesPodOperator, target-postgres)
+  #  - o scheduler (validate_task lê as contagens em raw.*)
+  # Dependência real: o host interno só existe depois do PostgreSQL instalado.
+  postgres_host     = module.postgres.internal_host
+  postgres_port     = module.postgres.port
+  postgres_user     = var.postgres_user
+  postgres_password = var.postgres_password
+  postgres_db       = var.postgres_db
 
-  depends_on = [module.minio]
+  depends_on = [module.postgres]
 }

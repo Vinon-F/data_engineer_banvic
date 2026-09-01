@@ -1,14 +1,18 @@
-# Credenciais do MinIO injetadas no Pod do Meltano (KubernetesPodOperator, via
-# env_from/secretRef) - evita hardcodar credenciais na DAG.
-resource "kubernetes_secret" "meltano_minio" {
+# Conexão com o PostgreSQL de destino, consumida por:
+#  - Pod do Meltano (KubernetesPodOperator, via env_from/secretRef) -> target-postgres
+#  - scheduler do Airflow (via scheduler.extraEnvFrom em main.tf) -> validate_task
+# Evita hardcodar credenciais nas DAGs.
+resource "kubernetes_secret" "meltano_postgres" {
   metadata {
-    name      = "meltano-minio-credentials"
+    name      = "meltano-postgres-credentials"
     namespace = kubernetes_namespace.airflow.metadata[0].name
   }
 
   data = {
-    MINIO_ENDPOINT   = var.minio_endpoint
-    MINIO_ACCESS_KEY = var.minio_access_key
-    MINIO_SECRET_KEY = var.minio_secret_key
+    POSTGRES_HOST     = var.postgres_host
+    POSTGRES_PORT     = var.postgres_port
+    POSTGRES_USER     = var.postgres_user
+    POSTGRES_PASSWORD = var.postgres_password
+    POSTGRES_DB       = var.postgres_db
   }
 }

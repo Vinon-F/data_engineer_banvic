@@ -14,26 +14,21 @@ plugins:
     select:
     - '*.*'
   loaders:
-  - name: target-s3
-    variant: crowemi
-    pip_url: git+https://github.com/crowemi/target-s3.git "setuptools<81"
-    python: '3.11'
+  - name: target-postgres
+    variant: meltanolabs
+    pip_url: meltanolabs-target-postgres
     config:
-      prefix: banvic
-      append_date_to_filename_grain: microsecond
-      cloud_provider:
-        cloud_provider_type: aws
-        aws:
-          aws_access_key_id: ${MINIO_ACCESS_KEY}
-          aws_secret_access_key: ${MINIO_SECRET_KEY}
-          aws_region: us-east-1
-          aws_bucket: raw
-          aws_endpoint_override: ${MINIO_ENDPOINT}
-      format:
-        format_type: parquet
-        format_parquet:
-          validate: true
-      max_batch_size: 30000
+      host: ${POSTGRES_HOST}
+      port: ${POSTGRES_PORT}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+      database: ${POSTGRES_DB}
+      default_target_schema: raw # camada raw do DW; criada na primeira carga
+      # Carga incremental: MERGE pela chave primária (vinda das `keys` do
+      # files_def.json / tap-csv). PK nova -> INSERT, PK existente -> UPDATE.
+      # Re-rodar o mesmo arquivo é no-op (idempotente); um arquivo novo a cada
+      # dia acumula o estado atual das entidades no DW.
+      load_method: upsert
   - name: target-jsonl
     variant: andyh1203
     pip_url: target-jsonl

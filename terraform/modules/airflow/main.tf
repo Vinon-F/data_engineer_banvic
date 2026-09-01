@@ -16,6 +16,24 @@ locals {
       name = kubernetes_config_map.dags.metadata[0].name
     }
   }
+
+  # Drop zone on-premises simulada (PV/PVC em drop_zone.tf). Montada nos mesmos
+  # 3 componentes que enxergam as DAGs: o scheduler roda unzip_task/validate_task/
+  # cleanup_task (LocalExecutor) e o FileSensor precisa ver o .zip; dagProcessor
+  # e apiServer entram só por consistência de spec.
+  drop_zone_volume = {
+    name = "on-premise-drop"
+    persistentVolumeClaim = {
+      claimName = kubernetes_persistent_volume_claim_v1.on_premise_drop.metadata[0].name
+    }
+  }
+  drop_zone_volume_mount = {
+    name      = "on-premise-drop"
+    mountPath = var.drop_zone_mount_path
+  }
+
+  extra_volumes       = [local.dags_volume, local.drop_zone_volume]
+  extra_volume_mounts = concat(local.dags_volume_mounts, [local.drop_zone_volume_mount])
 }
 
 resource "helm_release" "airflow" {
@@ -40,6 +58,17 @@ resource "helm_release" "airflow" {
   values = [
     yamlencode({
       executor = "LocalExecutor"
+
+      # Conexão `fs_default` que o FileSensor (wait_for_legacy_zip) usa. O Airflow
+      # já cria essa conexão por padrão no `db migrate`, mas declarar aqui deixa
+      # explícita a dependência e a torna imune a LOAD_DEFAULT_CONNECTIONS=False.
+      # `fs://` = conn_type fs sem basepath -> o `filepath` da DAG é absoluto.
+      env = [
+        {
+          name  = "AIRFLOW_CONN_FS_DEFAULT"
+          value = "fs://"
+        },
+      ]
 
       # CeleryExecutor-only components - desligados para caber nos recursos
       # padrão do minikube; não são necessários com LocalExecutor.
@@ -93,8 +122,8 @@ resource "helm_release" "airflow" {
             memory = "1Gi"
           }
         }
-        extraVolumes      = [local.dags_volume]
-        extraVolumeMounts = local.dags_volume_mounts
+        extraVolumes      = local.extra_volumes
+        extraVolumeMounts = local.extra_volume_mounts
         podAnnotations = {
           "checksum/dags" = local.dags_checksum
         }
@@ -111,8 +140,8 @@ resource "helm_release" "airflow" {
             memory = "512Mi"
           }
         }
-        extraVolumes      = [local.dags_volume]
-        extraVolumeMounts = local.dags_volume_mounts
+        extraVolumes      = local.extra_volumes
+        extraVolumeMounts = local.extra_volume_mounts
         podAnnotations = {
           "checksum/dags" = local.dags_checksum
         }
@@ -129,8 +158,17 @@ resource "helm_release" "airflow" {
             memory = "1Gi"
           }
         }
-        extraVolumes      = [local.dags_volume]
-        extraVolumeMounts = local.dags_volume_mounts
+        extraVolumes      = local.extra_volumes
+        extraVolumeMounts = local.extra_volume_mounts
+        # validate_task (PythonOperator, roda no scheduler com LocalExecutor) le
+        # POSTGRES_HOST/PORT/USER/PASSWORD/DB do ambiente. Sem credencial na DAG.
+        extraEnvFrom = yamlencode([
+          {
+            secretRef = {
+              name = kubernetes_secret.meltano_postgres.metadata[0].name
+            }
+          }
+        ])
         podAnnotations = {
           "checksum/dags" = local.dags_checksum
         }
