@@ -22,13 +22,12 @@ no PostgreSQL de destino pelo Meltano (camada `raw`). Tudo roda num Kubernetes l
 - **Orquestração**: Airflow 3.x (chart Helm `apache-airflow/airflow`,
   `LocalExecutor`). As DAGs são entregues ao cluster como `ConfigMap` pelo
   Terraform. É um atalho para esta POC mantém as DAGs versionadas junto do projeto e visíveis
-  no Airflow sem infra extra. Num ambiente real o mais indicado seria um
-  `git-sync` (sync puxando as DAGs de um repositório compartilhado) ou um volume dedicado.
+  no Airflow sem infra extra. Num ambiente real seria recomendado ter algo como um
+  `git-sync` (sync das DAGs de um repositório compartilhado) ou um volume dedicado.
 - **Ingestão**: a task `run_meltano` sobe um pod efêmero via
   `KubernetesPodOperator` e roda `meltano run tap-csv target-postgres`. Apenas a
   pasta com os CSVs do dia é montada, em modo read-only, em `/project/data/csvs`.
-  Em produção a imagem viria de um container registry por tag imutável
-  (SHA/SemVer), buildada e publicada pelo CI a cada mudança no repo — não via
+  Em produção a imagem poderia vir de um container registry, buildada e publicada pelo CI a cada mudança no repo e não via
   `minikube image load`.
 - **Destino**: PostgreSQL 16 dedicado (namespace `postgres`, banco `banvic_dw`,
   schema `raw`), separado do banco de metadados do Airflow. As credenciais
