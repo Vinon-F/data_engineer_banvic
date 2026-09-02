@@ -30,7 +30,6 @@ variable "chart_version" {
 
 # --- Conexão com o PostgreSQL de destino ---
 # Injetada como Secret no Pod do Meltano (KubernetesPodOperator) e no scheduler
-# (validate_task). Nenhuma credencial fica hardcoded nas DAGs.
 variable "postgres_host" {
   description = "Host interno do PostgreSQL de destino (DNS do Service)"
   type        = string

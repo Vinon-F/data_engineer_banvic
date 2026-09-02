@@ -104,7 +104,8 @@ resource "kubernetes_stateful_set_v1" "postgres" {
             }
           }
 
-          # Coloca os dados num subdiretório do volume, já que o initdb exige um diretório vazio e a raiz do mount ext4 vem com lost+found.
+          # Coloca os dados num subdiretório do volume, já que o initdb exige um diretório vazio 
+          # e a raiz do mount ext4 vem com lost+found (Recomendado pela documentação do postgress).
           env {
             name  = "PGDATA"
             value = "/var/lib/postgresql/data/pgdata"

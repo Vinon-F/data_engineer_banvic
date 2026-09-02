@@ -1,4 +1,6 @@
-# Empacota os arquivos de dags/ num ConfigMap, montado no scheduler/dagProcessor/apiServer (ver main.tf) — cabe código de DAG, não dados (limite de 1MiB).
+# Empacota os arquivos de dags/ num ConfigMap, montado no scheduler/dagProcessor/apiServer (ver main.tf) 
+# cabe código de DAG, não dados (limite de 1MiB).
+
 resource "kubernetes_config_map" "dags" {
   metadata {
     name      = "airflow-dags"

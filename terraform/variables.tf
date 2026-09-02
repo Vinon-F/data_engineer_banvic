@@ -10,7 +10,7 @@ variable "kube_context" {
   default     = "banvic"
 }
 
-# --- PostgreSQL (destino / Data Warehouse simulado) ---
+# --- PostgreSQL (destino DW)
 variable "postgres_user" {
   description = "Usuário da aplicação no PostgreSQL de destino"
   type        = string

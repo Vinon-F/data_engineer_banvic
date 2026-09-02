@@ -5,9 +5,7 @@ resource "kubernetes_namespace" "airflow" {
 }
 
 locals {
-  # Volume do ConfigMap com as DAGs (definido em dags.tf), montado no dagProcessor
-  # (parseia), no apiServer (aba "Code" da UI) e no scheduler (roda as tasks via
-  # LocalExecutor).
+  # Volume do ConfigMap com as DAGs (definido em dags.tf)
   dags_volume = {
     name = "dags"
     configMap = {
@@ -15,8 +13,7 @@ locals {
     }
   }
 
-  # Drop zone on-premises simulada (PV/PVC em drop_zone.tf), montada nos mesmos 3
-  # componentes: o scheduler roda as tasks e o FileSensor precisa enxergar o .zip.
+  # Drop zone on-premises simulada (PV/PVC em drop_zone.tf)
   drop_zone_volume = {
     name = "on-premise-drop"
     persistentVolumeClaim = {
@@ -44,12 +41,9 @@ resource "helm_release" "airflow" {
   create_namespace = false
   depends_on       = [kubernetes_namespace.airflow]
 
-  # Acima do padrão (300s): a imagem apache/airflow:3.2.2 (~2.2Gi) é baixada por
-  # 3 pods na primeira instalação.
-  timeout = 900
+  timeout = 500
 
-  # Espera os Jobs de migração/criação de usuário completarem, não só os
-  # Deployments/StatefulSets ficarem "Ready".
+  # Espera os Jobs de migração/criação de usuário completarem
   wait_for_jobs = true
 
   values = [
@@ -57,7 +51,6 @@ resource "helm_release" "airflow" {
       executor = "LocalExecutor"
 
       # Define a conexão `fs_default` usada pelo FileSensor. `fs://` = conn_type fs
-      # sem basepath, então o `filepath` da DAG é absoluto.
       env = [
         {
           name  = "AIRFLOW_CONN_FS_DEFAULT"
@@ -88,8 +81,7 @@ resource "helm_release" "airflow" {
         applyCustomEnv = false
       }
 
-      # Cria o usuário admin inicial (no Airflow 3.x isso é feito pelo createUserJob,
-      # não mais por webserver.defaultUser).
+      # Cria o usuário admin inicial (no Airflow 3.x isso é feito pelo createUserJob)
       createUserJob = {
         useHelmHooks   = false
         applyCustomEnv = false
