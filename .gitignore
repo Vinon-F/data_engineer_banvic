@@ -17,6 +17,8 @@ override.tf.json
 
 # Arquivos para auxílio da elaboração do projeto
 /docs
+/banvic_data/archive
+/dags/__pycache__
 
 # Meltano
 .venv

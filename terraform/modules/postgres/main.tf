@@ -1,13 +1,6 @@
 # PostgreSQL de destino do pipeline (Data Warehouse simulado - camada "raw").
-#
-# Deploy com manifests Kubernetes puros + a imagem oficial `postgres` (Docker
-# Official Image), sem Helm: o projeto PostgreSQL não publica chart oficial e o
-# chart bitnami/postgresql passou a depender de imagens fora do registry público
-# ("Bitnami Secure Images"). Para um POC single-node num minikube, um StatefulSet
-# de 1 réplica com PVC dedicado é suficiente e totalmente reproduzível.
-#
-# É uma instância separada do metadata DB do Airflow (que o chart do Airflow sobe
-# no namespace "airflow").
+# StatefulSet de 1 réplica com a imagem oficial `postgres` e PVC dedicado, via
+# manifests Kubernetes puros (sem Helm). Instância separada do metadata DB do Airflow.
 
 resource "kubernetes_namespace" "postgres" {
   metadata {
@@ -45,7 +38,8 @@ resource "kubernetes_persistent_volume_claim_v1" "data" {
     }
   }
 
-  # No minikube o provisionador dinâmico só cria o PV quando um Pod consome o PVC.
+  # Não bloqueia o apply esperando o bind: o provisionador dinâmico só cria o PV
+  # quando um Pod consome o PVC.
   wait_until_bound = false
 }
 
@@ -95,8 +89,7 @@ resource "kubernetes_stateful_set_v1" "postgres" {
       }
 
       spec {
-        # A imagem oficial roda como uid 999 (postgres); fs_group garante que o
-        # volume provisionado fique gravável por esse usuário.
+        # A imagem oficial roda como uid 999; fs_group torna o volume gravável por esse usuário.
         security_context {
           fs_group = 999
         }
@@ -111,8 +104,7 @@ resource "kubernetes_stateful_set_v1" "postgres" {
             }
           }
 
-          # PGDATA num subdiretório: o mountpoint do PVC pode conter `lost+found`,
-          # o que faz o initdb recusar inicializar direto na raiz do volume.
+          # Coloca os dados num subdiretório do volume, já que o initdb exige um diretório vazio e a raiz do mount ext4 vem com lost+found.
           env {
             name  = "PGDATA"
             value = "/var/lib/postgresql/data/pgdata"

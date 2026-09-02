@@ -43,6 +43,21 @@ das DAGs.
 
 ### 5. Acessar as UIs / serviços (port-forward)
 
+Em terminais separados (ou com `&` ao final):
+
+```bash
+# PostgreSQL de destino (Data Warehouse simulado)
+kubectl --context banvic -n postgres port-forward svc/postgres 5432:5432
+
+# Airflow UI
+kubectl --context banvic -n airflow port-forward svc/airflow-api-server 8080:8080
+```
+
+- PostgreSQL: `psql -h localhost -p 5432 -U banvic -d banvic_dw` (senha = var `postgres_password`).
+- Airflow UI: http://localhost:8080 — login `admin` / var `airflow_admin_password`.
+
+Para confirmar os nomes dos Services: `kubectl -n airflow get svc` e `kubectl -n postgres get svc`.
+
 ### 6. Rodar o pipeline
 
 ### 7. Conferir os dados
