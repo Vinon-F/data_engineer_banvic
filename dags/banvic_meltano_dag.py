@@ -10,14 +10,15 @@ Fluxo:
   claim_zip              move o dump -> {DROP}/archive/banvic_data_{{ ds }}.zip
         |                     (o .zip fica retido em archive/)
         v
-  unzip_and_check        extrai os CSVs em {DROP}/archive/banvic_data_{{ ds }}/,
-        |                     exige as 7 entidades e gera o files_def.json (paths
-        |                     absolutos) que o tap-csv lê dentro do pod do Meltano
+  unzip_and_check        extrai os CSVs do dia em {DROP}/archive/{{ ds }}_csvs/
+        |                     e exige as 7 entidades
         v
   run_meltano            KubernetesPodOperator -> `meltano run tap-csv target-postgres`
-        |                     (pod efêmero; carrega raw.* via upsert)
+        |                     (pod efêmero; a pasta do dia é montada em
+        |                     /project/data/csvs via subPathExpr; o tap-csv usa o
+        |                     files_def.json da imagem; carrega raw.* via upsert)
         v
-  delete_extracted_csvs  apaga {DROP}/archive/banvic_data_{{ ds }}/ ; o .zip permanece
+  delete_extracted_csvs  apaga {DROP}/archive/{{ ds }}_csvs/ ; o .zip permanece
 
 Drop zone: PVC `on-premise-drop` (terraform/modules/airflow/drop_zone.tf), um
 hostPath do minikube alimentado por `minikube mount`. O scheduler roda como UID
@@ -29,7 +30,6 @@ Agendamento `@daily`: o dump na drop zone deve ser nomeado pela data lógica UTC
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import shutil
@@ -59,14 +59,10 @@ ZIP_TEMPLATE = f"{DROP_ZONE}/banvic_data_{{{{ ds }}}}.zip"
 MELTANO_IMAGE = "banvic-meltano:v1.0"
 PG_SECRET = "meltano-postgres-credentials"
 
-# Manifesto por-dia (paths na perspectiva do pod) lido pelo tap-csv via override
-# `TAP_CSV_CSV_FILES_DEFINITION`; gerado em unzip_and_check.
-MELTANO_FILES_DEF_IN_POD = "/project/data/archive/banvic_data_{{ ds }}/files_def.json"
-
 
 def _day_dir(ds: str) -> str:
-    """Pasta dos CSVs extraídos do dump do dia (mesmo nome do .zip, sem extensão)."""
-    return f"{ARCHIVE_DIR}/banvic_data_{ds}"
+    """Pasta dos CSVs extraídos do dia; montada no pod em /project/data/csvs."""
+    return f"{ARCHIVE_DIR}/{ds}_csvs"
 
 
 def _claim_zip(ds: str) -> None:
@@ -87,8 +83,10 @@ def _claim_zip(ds: str) -> None:
 
 
 def _unzip(ds: str) -> None:
-    """Extrai os .csv do dia, exige as 7 entidades (ENTITIES) e grava o
-    files_def.json que o tap-csv consome dentro do pod.
+    """Extrai os .csv do dump do dia em _day_dir(ds) e exige as 7 entidades (ENTITIES).
+
+    O tap-csv usa o files_def.json embutido na imagem (só schema: entity + keys);
+    run_meltano monta esta pasta em /project/data/csvs.
     """
     zip_path = f"{ARCHIVE_DIR}/banvic_data_{ds}.zip"
     out_dir = _day_dir(ds)
@@ -112,19 +110,6 @@ def _unzip(ds: str) -> None:
     missing = sorted(set(ENTITIES) - extracted)
     if missing:
         raise AirflowException(f"CSVs ausentes no dump {ds}: {missing}")
-
-    files_def = [
-        {
-            "entity": entity,
-            "path": f"/project/data/archive/banvic_data_{ds}/{entity}.csv",
-            "keys": [key],
-        }
-        for entity, key in ENTITIES.items()
-    ]
-    manifest = os.path.join(out_dir, "files_def.json")
-    with open(manifest, "w", encoding="utf-8") as fh:
-        json.dump(files_def, fh, indent=2)
-    logger.info("gerado %s (%d entidades)", manifest, len(files_def))
 
 
 def _cleanup(ds: str) -> None:
@@ -185,8 +170,8 @@ with DAG(
         image_pull_policy="IfNotPresent",
         # ENTRYPOINT da imagem é `meltano`; passamos só os argumentos.
         arguments=["run", "tap-csv", "target-postgres"],
-        # Aponta o tap-csv para o manifesto por-dia gerado em unzip_and_check.
-        env_vars={"TAP_CSV_CSV_FILES_DEFINITION": MELTANO_FILES_DEF_IN_POD},
+        # Data passada ao subPathExpr do volume; o Kubernetes expande $(RUN_DS).
+        env_vars={"RUN_DS": "{{ ds }}"},
         volumes=[
             k8s.V1Volume(
                 name=DROP_ZONE_PVC,
@@ -198,8 +183,10 @@ with DAG(
         volume_mounts=[
             k8s.V1VolumeMount(
                 name=DROP_ZONE_PVC,
-                mount_path="/project/data/archive",
-                sub_path="archive",
+                # Só a pasta do dia (archive/<ds>_csvs/) vira /project/data/csvs,
+                # onde o files_def.json da imagem espera os arquivos.
+                mount_path="/project/data/csvs",
+                sub_path_expr="archive/$(RUN_DS)_csvs",
                 read_only=True,
             )
         ],
