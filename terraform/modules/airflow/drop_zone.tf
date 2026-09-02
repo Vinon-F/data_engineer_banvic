@@ -1,10 +1,4 @@
 # PV/PVC (volume persistente) para simular conexão "SFPT" com servidor on premises no minikube.
-#
-# storage_class_name usa uma StorageClass explícita ("manual", sem provisioner) em vez
-# de "" — o provider Terraform de Kubernetes omite o campo quando ele é uma string
-# vazia, o que faz o admission controller de storage class padrão do cluster carimbar
-# "standard" só no PVC (o PV não passa por esse admission controller), causando um
-# VolumeMismatch que impede o bind.
 resource "kubernetes_storage_class_v1" "manual" {
   metadata {
     name = "manual"
