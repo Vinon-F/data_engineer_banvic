@@ -1,10 +1,10 @@
 # Pipeline de ingestão BanVic (Airflow + Meltano + PostgreSQL)
 
-POC de infraestrutura e pipeline de dados para o Banco Vitória (BanVic). Um dump diário
-do ERP on-premises (um `.zip` com 7 CSVs) é depositado numa *drop zone*, detectado pelo
-Airflow via `FileSensor` e carregado no PostgreSQL de destino pelo Meltano (EL puro,
-camada `raw`). Tudo roda num Kubernetes local (**minikube**) provisionado por
-**Terraform**.
+POC de infraestrutura e pipeline de dados para o desafio de engenharia de dados da Indicium. Um dump diário
+simulando um ERP on-premises (`.zip` com 7 CSVs) é depositado numa *drop zone*, detectado por
+um `FileSensor` do Airflow que observa essa pasta como se fosse um diretório SFTP, e carregado
+no PostgreSQL de destino pelo Meltano (camada `raw`). Tudo roda num Kubernetes local
+(**minikube**) provisionado por **Terraform**.
 
 ## Arquitetura
 
@@ -12,16 +12,27 @@ camada `raw`). Tudo roda num Kubernetes local (**minikube**) provisionado por
   <img src="arquitetura.png" alt="Arquitetura BanVic" width="800">
 </p>
 
-- **Drop zone**: pasta host `banvic_data/` → path do nó `/mnt/on_premise_drop` (via
-  `minikube mount`) → PV/PVC `on-premise-drop`, montado nos pods do Airflow em
-  `/opt/airflow/data/on_premise_drop`. Dumps processados ficam retidos em `archive/`.
-- **Orquestração**: Airflow 3.x (chart `apache-airflow/airflow`), DAGs entregues como
-  `ConfigMap` pelo Terraform (rollout automático via checksum quando o código muda).
-- **Ingestão**: a task `run_meltano` lança um pod efêmero (`KubernetesPodOperator`) que
-  roda `meltano run tap-csv target-postgres`; só a pasta de CSVs do dia é montada
-  read-only em `/project/data/csvs`.
-- **Destino**: PostgreSQL 16 dedicado (namespace `postgres`, DB `banvic_dw`, schema
-  `raw`), separado do metadata DB do Airflow. Credenciais só via `Secret`.
+- **Drop zone (simula um SFTP)**: num cenário real, o ERP on-premises do BanVic
+  entregaria o dump diário num servidor SFTP de recepção. Aqui essa entrega é
+  simulada por uma pasta no host (`banvic_data/`), que o Airflow varre como
+  faria com um diretório remoto. O arquivo percorre: pasta do host →
+  `/mnt/on_premise_drop` no nó (via `minikube mount`) → PV/PVC `on-premise-drop`
+  → montado nos pods do Airflow em `/opt/airflow/data/on_premise_drop`, onde o
+  `FileSensor` o detecta. Dumps já processados ficam retidos em `archive/`.
+- **Orquestração**: Airflow 3.x (chart Helm `apache-airflow/airflow`,
+  `LocalExecutor`). As DAGs são entregues ao cluster como `ConfigMap` pelo
+  Terraform. É um atalho para esta POC mantém as DAGs versionadas junto do projeto e visíveis
+  no Airflow sem infra extra. Num ambiente real o mais indicado seria um
+  `git-sync` (sync puxando as DAGs de um repositório compartilhado) ou um volume dedicado.
+- **Ingestão**: a task `run_meltano` sobe um pod efêmero via
+  `KubernetesPodOperator` e roda `meltano run tap-csv target-postgres`. Apenas a
+  pasta com os CSVs do dia é montada, em modo read-only, em `/project/data/csvs`.
+  Em produção a imagem viria de um container registry por tag imutável
+  (SHA/SemVer), buildada e publicada pelo CI a cada mudança no repo — não via
+  `minikube image load`.
+- **Destino**: PostgreSQL 16 dedicado (namespace `postgres`, banco `banvic_dw`,
+  schema `raw`), separado do banco de metadados do Airflow. As credenciais
+  chegam somente via `Secret`.
 
 ## Pré-requisitos
 
