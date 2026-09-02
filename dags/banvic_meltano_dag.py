@@ -43,8 +43,6 @@ from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.sensors.filesystem import FileSensor
 from kubernetes.client import models as k8s
 
-from banvic_validate import ENTITIES
-
 logger = logging.getLogger(__name__)
 
 # Caminho do PVC `on-premise-drop` montado nos pods do Airflow.
@@ -58,6 +56,20 @@ ZIP_TEMPLATE = f"{DROP_ZONE}/banvic_data_{{{{ ds }}}}.zip"
 
 MELTANO_IMAGE = "banvic-meltano:v1.0"
 PG_SECRET = "meltano-postgres-credentials"
+
+# Nomes dos CSVs (sem extensão) que o dump diário deve conter. O schema em si
+# — colunas e chaves — vive no files_def.json embutido na imagem do Meltano.
+EXPECTED_ENTITIES = frozenset(
+    {
+        "agencias",
+        "clientes",
+        "colaborador_agencia",
+        "colaboradores",
+        "contas",
+        "propostas_credito",
+        "transacoes",
+    }
+)
 
 
 def _day_dir(ds: str) -> str:
@@ -83,7 +95,7 @@ def _claim_zip(ds: str) -> None:
 
 
 def _unzip(ds: str) -> None:
-    """Extrai os .csv do dump do dia em _day_dir(ds) e exige as 7 entidades (ENTITIES).
+    """Extrai os .csv do dump do dia em _day_dir(ds) e exige EXPECTED_ENTITIES.
 
     O tap-csv usa o files_def.json embutido na imagem (só schema: entity + keys);
     run_meltano monta esta pasta em /project/data/csvs.
@@ -107,7 +119,7 @@ def _unzip(ds: str) -> None:
             logger.info("extraído %s -> %s", member, target)
 
     extracted = {os.path.splitext(os.path.basename(m))[0] for m in members}
-    missing = sorted(set(ENTITIES) - extracted)
+    missing = sorted(EXPECTED_ENTITIES - extracted)
     if missing:
         raise AirflowException(f"CSVs ausentes no dump {ds}: {missing}")
 
