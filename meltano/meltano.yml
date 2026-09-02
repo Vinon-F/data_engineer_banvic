@@ -23,12 +23,5 @@ plugins:
       user: ${POSTGRES_USER}
       password: ${POSTGRES_PASSWORD}
       database: ${POSTGRES_DB}
-      default_target_schema: raw # camada raw do DW; criada na primeira carga
-      # Carga incremental: MERGE pela chave primária (vinda das `keys` do
-      # files_def.json / tap-csv). PK nova -> INSERT, PK existente -> UPDATE.
-      # Re-rodar o mesmo arquivo é no-op (idempotente); um arquivo novo a cada
-      # dia acumula o estado atual das entidades no DW.
+      default_target_schema: raw
       load_method: upsert
-  - name: target-jsonl
-    variant: andyh1203
-    pip_url: target-jsonl

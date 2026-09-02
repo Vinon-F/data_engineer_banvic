@@ -22,7 +22,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Entidades do ERP BanVic e suas chaves primárias (espelha meltano/files_def.json).
+# Entidades do tap-csv em files_conf.json
 ENTITIES: dict[str, str] = {
     "agencias": "cod_agencia",
     "clientes": "cod_cliente",

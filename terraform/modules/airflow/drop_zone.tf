@@ -1,4 +1,16 @@
-# PV/PVC (volume persistente) para simular conexão com servidor on premises no minikube.
+# PV/PVC (volume persistente) para simular conexão "SFPT" com servidor on premises no minikube.
+#
+# storage_class_name usa uma StorageClass explícita ("manual", sem provisioner) em vez
+# de "" — o provider Terraform de Kubernetes omite o campo quando ele é uma string
+# vazia, o que faz o admission controller de storage class padrão do cluster carimbar
+# "standard" só no PVC (o PV não passa por esse admission controller), causando um
+# VolumeMismatch que impede o bind.
+resource "kubernetes_storage_class_v1" "manual" {
+  metadata {
+    name = "manual"
+  }
+  storage_provisioner = "kubernetes.io/no-provisioner"
+}
 
 resource "kubernetes_persistent_volume_v1" "on_premise_drop" {
   metadata {
@@ -11,7 +23,7 @@ resource "kubernetes_persistent_volume_v1" "on_premise_drop" {
     }
     access_modes                     = ["ReadWriteOnce"]
     persistent_volume_reclaim_policy = "Retain"
-    storage_class_name               = ""
+    storage_class_name               = kubernetes_storage_class_v1.manual.metadata[0].name
 
     persistent_volume_source {
       host_path {
@@ -30,7 +42,7 @@ resource "kubernetes_persistent_volume_claim_v1" "on_premise_drop" {
 
   spec {
     access_modes       = ["ReadWriteOnce"]
-    storage_class_name = ""
+    storage_class_name = kubernetes_storage_class_v1.manual.metadata[0].name
     volume_name        = kubernetes_persistent_volume_v1.on_premise_drop.metadata[0].name
 
     resources {

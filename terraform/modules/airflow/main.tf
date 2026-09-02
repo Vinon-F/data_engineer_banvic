@@ -30,6 +30,11 @@ locals {
   drop_zone_volume_mount = {
     name      = "on-premise-drop"
     mountPath = var.drop_zone_mount_path
+    # hostPath usa mountPropagation None por padrao: o `minikube mount` (9p) so
+    # aparece dentro do pod se ja estava montado no no antes do pod subir.
+    # HostToContainer (rslave) faz o mount do host propagar pra dentro do
+    # container independente da ordem, sem precisar recriar o pod.
+    mountPropagation = "HostToContainer"
   }
 
   extra_volumes       = [local.dags_volume, local.drop_zone_volume]
@@ -162,13 +167,20 @@ resource "helm_release" "airflow" {
         extraVolumeMounts = local.extra_volume_mounts
         # validate_task (PythonOperator, roda no scheduler com LocalExecutor) le
         # POSTGRES_HOST/PORT/USER/PASSWORD/DB do ambiente. Sem credencial na DAG.
-        extraEnvFrom = yamlencode([
-          {
-            secretRef = {
-              name = kubernetes_secret.meltano_postgres.metadata[0].name
+        # Usa scheduler.env (não extraEnvFrom): o schema do chart só aceita
+        # extraEnvFrom no nível global (afeta todos os componentes), e
+        # scheduler tem additionalProperties=false.
+        env = [
+          for key in ["POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"] : {
+            name = key
+            valueFrom = {
+              secretKeyRef = {
+                name = kubernetes_secret.meltano_postgres.metadata[0].name
+                key  = key
+              }
             }
           }
-        ])
+        ]
         podAnnotations = {
           "checksum/dags" = local.dags_checksum
         }
