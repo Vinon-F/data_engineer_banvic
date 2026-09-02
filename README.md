@@ -9,15 +9,15 @@ camada `raw`). Tudo roda num Kubernetes local (**minikube**) provisionado por
 ## Arquitetura
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph HOST["host — WSL2 / Ubuntu"]
-        direction LR
+        direction TB
         ZIP["banvic_data_&lt;data&gt;.zip<br/>drop zone no host"]
         IMG["imagem<br/>banvic-meltano:v1.0"]
         TF["Terraform<br/>(IaC)"]
     end
 
-    subgraph MK["minikube — cluster banvic"]
+    subgraph MK["minikube — cluster banvic (minikube start)"]
         direction TB
 
         subgraph NSA["namespace: airflow"]
@@ -39,8 +39,6 @@ flowchart TD
     end
 
     ANALISTA["Analista / BI"]
-
-    HOST ~~~ MK
 
     TF -->|terraform apply| MK
     ZIP -->|minikube mount| PVC
