@@ -10,9 +10,12 @@ camada `raw`). Tudo roda num Kubernetes local (**minikube**) provisionado por
 
 ```mermaid
 flowchart TD
-    ZIP["banvic_data_&lt;data&gt;.zip<br/>drop zone no host"]
-    IMG["imagem<br/>banvic-meltano:v1.0"]
-    TF["Terraform<br/>(IaC)"]
+    subgraph HOST["host — WSL2 / Ubuntu"]
+        direction LR
+        ZIP["banvic_data_&lt;data&gt;.zip<br/>drop zone no host"]
+        IMG["imagem<br/>banvic-meltano:v1.0"]
+        TF["Terraform<br/>(IaC)"]
+    end
 
     subgraph MK["minikube — cluster banvic"]
         direction TB
@@ -22,8 +25,8 @@ flowchart TD
             PVC["PV/PVC on-premise-drop<br/>hostPath via minikube mount"]
             AF["Airflow 3 · Helm chart · LocalExecutor"]
             DAG["DAG banvic_meltano_extract_load<br/>wait_for_zip → claim_zip → unzip_and_check<br/>→ run_meltano → delete_extracted_csvs"]
-            MELT["pod efêmero Meltano<br/>tap-csv → target-postgres · upsert"]
             SEC["Secret<br/>meltano-postgres-credentials"]
+            MELT["pod efêmero Meltano<br/>tap-csv → target-postgres · upsert"]
         end
 
         subgraph NSP["namespace: postgres"]
@@ -31,13 +34,17 @@ flowchart TD
             SVC["svc/postgres:5432"]
             PG["StatefulSet postgres:16<br/>DB banvic_dw · schema raw"]
         end
+
+        NSA ~~~ NSP
     end
 
     ANALISTA["Analista / BI"]
 
+    HOST ~~~ MK
+
+    TF -->|terraform apply| MK
     ZIP -->|minikube mount| PVC
     IMG -->|minikube image load| MELT
-    TF -->|terraform apply| MK
 
     PVC --> AF --> DAG
     DAG -->|KubernetesPodOperator| MELT
@@ -45,6 +52,11 @@ flowchart TD
     SEC --> MELT
     MELT -->|INSERT/UPDATE por PK| SVC --> PG
     PG -->|kubectl port-forward 5432| ANALISTA
+
+    style HOST stroke:#8b8b8b,stroke-width:1px,stroke-dasharray:5 4
+    style MK stroke:#8b8b8b,stroke-width:2px
+    style NSA stroke:#8b8b8b,stroke-width:1px
+    style NSP stroke:#8b8b8b,stroke-width:1px
 ```
 
 - **Drop zone**: pasta host `banvic_data/` → path do nó `/mnt/on_premise_drop` (via
