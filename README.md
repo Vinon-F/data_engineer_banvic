@@ -1,28 +1,48 @@
+<<<<<<< HEAD
 ## EM CONSTRUÇÃO ...
+=======
+# Pipeline de ingestão (Airflow + Meltano + PostgreSQL)
+
+POC de infraestrutura e pipeline de dados: dump diário do ERP on-premises do
+BanVic (um `.zip` de CSVs) é detectado pelo Airflow, extraído/carregado no
+PostgreSQL pelo Meltano e validado em Kubernetes local (minikube), provisionado por Terraform.
+
+## Arquitetura
+
+## Pré-requisitos
+
+## Passo a passo
+
+### 1. Cluster
 
 ```bash
 minikube start --driver=docker -p banvic
 ```
 
-```bash
-kubectl config current-context
-```
-
-## Acessar as UIs (port-forward)
-
-Depois do `terraform apply`, em dois terminais separados (o `kubectl port-forward` fica ocupando o terminal):
+### 2. Imagem do Meltano
 
 ```bash
-kubectl port-forward -n minio svc/minio-console 9001:9001
-```
-```bash
-kubectl port-forward -n airflow svc/airflow-api-server 8080:8080
+docker build -t banvic-meltano:v1.0 -f meltano/dockerfile meltano/
+minikube image load banvic-meltano:v1.0 -p banvic
 ```
 
-Ou os dois de uma vez, num único terminal (roda em background; `Ctrl+C` encerra ambos):
+### 3. Drop zone on-premises simulada
+
 ```bash
-kubectl port-forward -n minio svc/minio-console 9001:9001 & kubectl port-forward -n airflow svc/airflow-api-server 8080:8080 & wait
+minikube mount "$(git rev-parse --show-toplevel)/banvic_data:/mnt/on_premise_drop" -p banvic --uid 50000 --gid 0 &
 ```
 
-- MinIO console: http://localhost:9001 (usuário/senha = `minio_root_user`/`minio_root_password` do `secrets.auto.tfvars`)
-- Airflow UI: http://localhost:8080 (usuário/senha = `admin`/`airflow_admin_password` do `secrets.auto.tfvars`)
+```bash
+cd terraform && terraform init && terraform apply
+```
+
+Sobe: namespace `postgres` (StatefulSet com a imagem oficial `postgres:16`, db
+`banvic_dw`), namespace `airflow` (chart `apache-airflow/airflow`, LocalExecutor),
+o Secret `meltano-postgres-credentials`, o PV/PVC `on-premise-drop` e o ConfigMap
+das DAGs.
+
+### 5. Acessar as UIs / serviços (port-forward)
+
+### 6. Rodar o pipeline
+
+### 7. Conferir os dados

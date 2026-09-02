@@ -1,8 +1,9 @@
-module "minio" {
-  source = "./modules/minio"
+module "postgres" {
+  source = "./modules/postgres"
 
-  root_user     = var.minio_root_user
-  root_password = var.minio_root_password
+  postgres_user     = var.postgres_user
+  postgres_password = var.postgres_password
+  postgres_db       = var.postgres_db
 }
 
 module "airflow" {
@@ -11,8 +12,12 @@ module "airflow" {
   admin_password = var.airflow_admin_password
   fernet_key     = var.airflow_fernet_key
 
-  # Não é uma dependência real de infraestrutura (nenhum output do MinIO
-  # alimenta o Airflow) - só ordena o apply para um log mais legível na demo.
-  # A dependência real (DAGs lendo do MinIO) é em nível de aplicação/runtime.
-  depends_on = [module.minio]
+  # PostgreSQL repassada como Secret para Airflow, KubernetesPodOperator, Meltano (target-postgres).
+  postgres_host     = module.postgres.internal_host
+  postgres_port     = module.postgres.port
+  postgres_user     = var.postgres_user
+  postgres_password = var.postgres_password
+  postgres_db       = var.postgres_db
+
+  depends_on = [module.postgres]
 }

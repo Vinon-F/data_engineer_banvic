@@ -10,17 +10,23 @@ variable "kube_context" {
   default     = "banvic"
 }
 
-# --- MinIO ---
-variable "minio_root_user" {
-  description = "Usuário root do MinIO"
+# --- PostgreSQL (destino / Data Warehouse simulado) ---
+variable "postgres_user" {
+  description = "Usuário da aplicação no PostgreSQL de destino"
   type        = string
-  default     = "minioadmin"
+  default     = "banvic"
 }
 
-variable "minio_root_password" {
-  description = "Senha root do MinIO"
+variable "postgres_password" {
+  description = "Senha do usuário da aplicação no PostgreSQL de destino"
   type        = string
   sensitive   = true
+}
+
+variable "postgres_db" {
+  description = "Database de destino (Data Warehouse simulado)"
+  type        = string
+  default     = "banvic_dw"
 }
 
 # --- Airflow ---

@@ -1,0 +1,27 @@
+default_environment: dev
+project_id: 01a03ac6-7eb7-7f52-9135-64833311a397
+environments:
+- name: dev
+- name: staging
+- name: prod
+plugins:
+  extractors:
+  - name: tap-csv
+    variant: meltanolabs
+    pip_url: git+https://github.com/MeltanoLabs/tap-csv.git
+    config:
+      csv_files_definition: files_def.json # Arquivo Json com o schema das tabelas para o extractor.
+    select:
+    - '*.*'
+  loaders:
+  - name: target-postgres
+    variant: meltanolabs
+    pip_url: meltanolabs-target-postgres
+    config:
+      host: ${POSTGRES_HOST}
+      port: ${POSTGRES_PORT}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+      database: ${POSTGRES_DB}
+      default_target_schema: raw
+      load_method: upsert

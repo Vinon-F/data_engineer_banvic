@@ -1,0 +1,12 @@
+# Ambiente local
+venv
+.meltano
+
+# Credenciais
+.env
+
+# Arquivos de teste
+data
+output
+banvic_validation.duckdb
+validate.py
