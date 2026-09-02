@@ -5,7 +5,8 @@ transformação ficam para uma etapa dbt posterior.
 
 Fluxo:
 
-  wait_for_legacy_zip    FileSensor espera {DROP}/banvic_data_{{ ds }}.zip
+  wait_for_zip           FileSensor espera {DROP}/banvic_data_{{ ds }}.zip
+        |                     (falha se não aparecer em 10 min)
         v
   claim_zip              move o dump -> {DROP}/archive/banvic_data_{{ ds }}.zip
         |                     (o .zip fica retido em archive/)
@@ -57,8 +58,8 @@ ZIP_TEMPLATE = f"{DROP_ZONE}/banvic_data_{{{{ ds }}}}.zip"
 MELTANO_IMAGE = "banvic-meltano:v1.0"
 PG_SECRET = "meltano-postgres-credentials"
 
-# Nomes dos CSVs (sem extensão) que o dump diário deve conter. O schema em si
-# — colunas e chaves — vive no files_def.json embutido na imagem do Meltano.
+# Nomes dos CSVs que serão checados no unzip, se o arquivo csv não existir, causará erro no pod Meltano
+# Colunas e chaves reais estão definidas na imagem do meltano no arquivo meltano/files_def.json
 EXPECTED_ENTITIES = frozenset(
     {
         "agencias",
@@ -96,8 +97,6 @@ def _claim_zip(ds: str) -> None:
 
 def _unzip(ds: str) -> None:
     """Extrai os .csv do dump do dia em _day_dir(ds) e exige EXPECTED_ENTITIES.
-
-    O tap-csv usa o files_def.json embutido na imagem (só schema: entity + keys);
     run_meltano monta esta pasta em /project/data/csvs.
     """
     zip_path = f"{ARCHIVE_DIR}/banvic_data_{ds}.zip"
@@ -134,7 +133,7 @@ def _cleanup(ds: str) -> None:
 
 default_args = {
     "retries": 2,
-    "retry_delay": timedelta(minutes=5),
+    "retry_delay": timedelta(minutes=1),
 }
 
 with DAG(
@@ -143,23 +142,21 @@ with DAG(
         "Detecta o dump diário do ERP on-premises (BanVic) via FileSensor e "
         "extrai/carrega no PostgreSQL (camada raw) via Meltano."
     ),
-    start_date=datetime(2026, 1, 1),
+    start_date=datetime(2026, 9, 2),
     schedule="@daily",
     catchup=False,
     max_active_runs=1,
     default_args=default_args,
-    tags=["banvic", "meltano", "elt"],
+    tags=["banvic", "meltano", "el"],
+
 ) as dag:
-    wait_for_legacy_zip = FileSensor(
-        task_id="wait_for_legacy_zip",
+    wait_for_zip = FileSensor(
+        task_id="wait_for_zip",
         fs_conn_id="fs_default",
         filepath=ZIP_TEMPLATE,
         poke_interval=30,
         timeout=60 * 10,
         mode="reschedule",
-        # Dia sem dump: run marcado como skipped em vez de failed.
-        soft_fail=True,
-        retries=0,
     )
 
     claim_zip = PythonOperator(
@@ -220,7 +217,7 @@ with DAG(
     )
 
     (
-        wait_for_legacy_zip
+        wait_for_zip
         >> claim_zip
         >> unzip_and_check
         >> run_meltano
