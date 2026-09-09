@@ -29,9 +29,7 @@ no PostgreSQL de destino pelo Meltano (camada `raw`). Tudo roda num Kubernetes l
   pasta com os CSVs do dia é montada, em modo read-only, em `/project/data/csvs`.
   Em produção a imagem viria de um container registry por tag imutável
   (SHA/SemVer), buildada e publicada pelo CI a cada mudança no repo não via
-  Em produção a imagem poderia vir de um container registry, buildada e publicada pelo CI a cada mudança no repo e não via
-
-  `minikube image load`.
+  Em produção a imagem poderia vir de um container registry, buildada e publicada pelo CI a cada mudança no repo e não via `minikube image load`.
 - **Destino**: PostgreSQL 16 dedicado (namespace `postgres`, banco `banvic_dw`,
   schema `raw`), separado do banco de metadados do Airflow. As credenciais
   chegam somente via `Secret`.
@@ -133,10 +131,6 @@ date = hoje). A DAG executa, em cadeia:
 **Notificações por e-mail.** Qualquer task que falhe (após esgotar os 2 retries)
 dispara um e-mail via `email_on_failure`; um run bem-sucedido dispara o e-mail de
 `notify_success`. O relay é um **Mailpit** (SMTP fake, `terraform/modules/airflow/mailpit.tf`)
-— sem conta de e-mail nem chave de API, e nada sai do cluster. Veja as mensagens em
-http://localhost:8025 (port-forward acima). Para entrega real (Gmail etc.), basta
-trocar a connection `smtp_default` em `terraform/modules/airflow/main.tf` por um
-relay autenticado; a DAG não muda.
 
 ### 7. Conferir os dados
 
@@ -157,10 +151,10 @@ para uma etapa posterior, fora do escopo desta POC.
 `load_method: upsert`, usando as chaves declaradas em `meltano/files_def.json` como
 chave de merge: PK nova → `INSERT`, PK existente → `UPDATE`. Consequências:
 
-- **Idempotência**: re-rodar a DAG com o mesmo `.zip` é um no-op — cobre `retries` e
+- **Idempotência**: é possível re-rodar a DAG com o mesmo `.zip`. Cobre `retries` e
   re-execuções manuais sem duplicar dados.
 - **Incremental**: um `banvic_data_<data>.zip` novo a cada dia acumula o estado atual
-  das entidades no DW, sem recriar as tabelas.
+  das entidades no DW, sem recriar as tabelas. Exige backfilling das dags.
 
 O *extract* relê o CSV inteiro a cada execução (o `tap-csv` não usa replication
 key/bookmark); a incrementalidade vem inteiramente do lado do *load*.
@@ -180,16 +174,3 @@ transitórias seguras de reexecutar.
 | `contas` | `num_conta` |
 | `propostas_credito` | `cod_proposta` |
 | `transacoes` | `cod_transacao` |
-
-> Limitação conhecida: `colaborador_agencia` é uma tabela ponte, mas usa só
-> `cod_colaborador` como chave (não a composta `cod_colaborador + cod_agencia`) — um
-> colaborador em mais de uma agência sofreria upsert em cima de si mesmo. Ajustar
-> quando a modelagem entrar.
-
-## Segredos
-
-Nenhuma credencial versionada. `postgres_password`, `airflow_admin_password` e
-`airflow_fernet_key` vivem em `terraform/secrets.auto.tfvars` (gitignored); o Terraform
-as materializa no `Secret meltano-postgres-credentials`, consumido via `env_from` pelo
-pod Meltano e via `extraEnvFrom` pelo scheduler. A DAG e o `meltano.yml` só referenciam
-variáveis (`${POSTGRES_*}`).

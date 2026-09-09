@@ -1,14 +1,14 @@
-"""Ingestão EL (`@daily`) do dump diário do ERP on-premises (BanVic).
+"""Ingestão EL (`@daily`) do dump diário do ERP BANVIC
 
-Só Extract + Load: os CSVs vão para `raw.
-Fluxo: wait_for_zip (FileSensor) -> claim_zip (move p/ archive/) -> unzip_and_check
-(extrai e exige as 7 entidades) -> run_meltano (KubernetesPodOperator, `meltano run
-tap-csv target-postgres`, upsert em raw.*) -> delete_extracted_csvs (só o .zip
-permanece) -> notify_success (EmailOperator).
+Fluxo: 
+wait_for_zip (FileSensor) -> 
+claim_zip (move p/ archive/) -> 
+unzip_and_check (extrai e exige as 7 entidades) -> 
+run_meltano (tap-csv target-postgress) -> 
+delete_extracted_csvs -> 
+notify_success (EmailOperator).
 
-Falhas disparam e-mail via `email_on_failure`. E-mails vão para o Mailpit (SMTP
-fake, conn `smtp_default`). Drop zone: PVC `on-premise-drop`. O dump deve ser
-nomeado pela data lógica UTC (`banvic_data_{{ ds }}.zip`). `catchup=False`.
+Falhas disparam e-mail via `email_on_failure`.
 """
 
 from __future__ import annotations
