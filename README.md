@@ -28,7 +28,7 @@ no PostgreSQL de destino pelo Meltano (camada `raw`). Tudo roda num Kubernetes l
   `KubernetesPodOperator` e roda `meltano run tap-csv target-postgres`. Apenas a
   pasta com os CSVs do dia é montada, em modo read-only, em `/project/data/csvs`.
   Em produção a imagem viria de um container registry por tag imutável
-  (SHA/SemVer), buildada e publicada pelo CI a cada mudança no repo — não via
+  (SHA/SemVer), buildada e publicada pelo CI a cada mudança no repo não via
   `minikube image load`.
 - **Destino**: PostgreSQL 16 dedicado (namespace `postgres`, banco `banvic_dw`,
   schema `raw`), separado do banco de metadados do Airflow. As credenciais
@@ -54,8 +54,6 @@ minikube start --driver=docker -p banvic
 
 ### 2. Buildar e carregar a imagem do Meltano
 
-O Terraform **não** builda imagens.
-
 ```bash
 docker build -t banvic-meltano:v1.0 -f meltano/dockerfile meltano/
 minikube image load banvic-meltano:v1.0 -p banvic
@@ -67,11 +65,10 @@ minikube image load banvic-meltano:v1.0 -p banvic
 cp terraform/secrets.auto.tfvars.example terraform/secrets.auto.tfvars
 # Edite terraform/secrets.auto.tfvars e defina:
 #   postgres_password, airflow_admin_password, airflow_fernet_key
-# Fernet key:
+# Fernet key: (chave de criptorgrafia para o banco de metadados do airflow)
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-`terraform/secrets.auto.tfvars` é gitignored.
 
 ### 4. Provisionar a infraestrutura
 
@@ -86,25 +83,22 @@ PV/PVC `on-premise-drop` e o `ConfigMap` das DAGs.
 ### 5. Mount da drop zone + port-forwards (um comando, mesmo terminal)
 
 ```bash
-# Sobe os 3 processos em foreground no mesmo terminal. Ctrl+C derruba todos juntos.
+# Sobe os 4 processos em foreground no mesmo terminal. Ctrl+C derruba todos juntos. Manter o terminal ativo durante a execução do projeto.
 ( trap 'kill 0' EXIT
   minikube mount "$(git rev-parse --show-toplevel)/banvic_data:/mnt/on_premise_drop" -p banvic --uid 50000 --gid 0 &
   kubectl --context banvic -n postgres port-forward svc/postgres 5432:5432 &
   kubectl --context banvic -n airflow port-forward svc/airflow-api-server 8080:8080 &
+  kubectl --context banvic -n airflow port-forward svc/mailpit 8025:8025 &
   wait )
 ```
 
-O subshell com `trap 'kill 0' EXIT` garante que o `Ctrl+C` mata o mount e os dois
-port-forwards ao mesmo tempo; o `wait` mantém o terminal preso aos 3. O `--uid 50000`
-é necessário porque o scheduler do Airflow roda como UID 50000 e precisa escrever na
-drop zone.
-
-Se preferir 3 terminais separados:
+Se preferir 4 terminais separados:
 
 ```bash
 minikube mount "$(git rev-parse --show-toplevel)/banvic_data:/mnt/on_premise_drop" -p banvic --uid 50000 --gid 0
 kubectl --context banvic -n postgres port-forward svc/postgres 5432:5432
 kubectl --context banvic -n airflow port-forward svc/airflow-api-server 8080:8080
+kubectl --context banvic -n airflow port-forward svc/mailpit 8025:8025
 ```
 
 Acessos:
@@ -112,10 +106,13 @@ Acessos:
 - **Airflow UI**: http://localhost:8080 — login `admin` / `airflow_admin_password`.
 - **PostgreSQL destino**: `psql -h localhost -p 5432 -U banvic -d banvic_dw`
   (senha = `postgres_password`).
+- **Mailpit (notificações)**: http://localhost:8025 — SMTP fake que captura os
+  e-mails da DAG (falha e sucesso); nada sai do cluster.
 
 ### 6. Rodar o pipeline
 
-Deposite o dump do dia na drop zone, nomeado pela data (UTC):
+Deposite o dump do dia na drop zone, nomeado pela data (UTC), exemplo: banvic_data_2026-09-09
+Comando abaixo já copia o .zip original e renomeia simulando um dump diário.
 
 ```bash
 cp "banvic_data/Dados Banvic.zip" "banvic_data/banvic_data_$(date +%F).zip"
@@ -126,9 +123,18 @@ date = hoje). A DAG executa, em cadeia:
 
 1. `wait_for_zip` — `FileSensor` (modo `reschedule`) aguarda o `.zip` do dia (timeout 10 min).
 2. `claim_zip` — move o dump para `archive/banvic_data_<ds>.zip` (retenção permanente).
-3. `unzip_and_check` — extrai os CSVs em `archive/<ds>_csvs/` e exige as 7 entidades.
-4. `run_meltano_tap_csv_target_postgres` — pod efêmero roda `meltano run tap-csv target-postgres`.
+3. `unzip_and_check` — extrai os CSVs em `archive/<ds>_csvs/` e exige as 7 entidades (7 tabelas).
+4. `run_meltano_tap_csv_target_postgres` — pod roda `meltano run tap-csv target-postgres` e se destrói após execução. 
 5. `delete_extracted_csvs` — remove só os CSVs extraídos do dia; o `.zip` permanece.
+6. `notify_success` — envia um e-mail de resumo do run (só se a cadeia inteira passou).
+
+**Notificações por e-mail.** Qualquer task que falhe (após esgotar os 2 retries)
+dispara um e-mail via `email_on_failure`; um run bem-sucedido dispara o e-mail de
+`notify_success`. O relay é um **Mailpit** (SMTP fake, `terraform/modules/airflow/mailpit.tf`)
+— sem conta de e-mail nem chave de API, e nada sai do cluster. Veja as mensagens em
+http://localhost:8025 (port-forward acima). Para entrega real (Gmail etc.), basta
+trocar a connection `smtp_default` em `terraform/modules/airflow/main.tf` por um
+relay autenticado; a DAG não muda.
 
 ### 7. Conferir os dados
 

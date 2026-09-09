@@ -12,3 +12,8 @@ output "airflow_webserver_port_forward" {
   description = "Comando para acessar a UI do Airflow localmente (Airflow 3.x: componente api-server)"
   value       = "kubectl port-forward -n ${module.airflow.namespace} svc/airflow-api-server 8080:8080"
 }
+
+output "mailpit_port_forward" {
+  description = "Comando para acessar a UI do Mailpit (notificações da DAG) em http://localhost:8025"
+  value       = "kubectl port-forward -n ${module.airflow.namespace} svc/mailpit 8025:8025"
+}

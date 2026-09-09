@@ -28,6 +28,12 @@ variable "chart_version" {
   default     = "1.22.0"
 }
 
+variable "mailpit_image" {
+  description = "Imagem do Mailpit (SMTP fake + UI web para capturar as notificações da DAG)."
+  type        = string
+  default     = "axllent/mailpit:v1.21"
+}
+
 # --- Conexão com o PostgreSQL de destino ---
 # Injetada como Secret no Pod do Meltano (KubernetesPodOperator) e no scheduler
 variable "postgres_host" {

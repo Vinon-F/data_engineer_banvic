@@ -1,32 +1,14 @@
-"""Ingestão EL do dump diário do ERP on-premises (BanVic) orquestrada pelo Airflow.
+"""Ingestão EL (`@daily`) do dump diário do ERP on-premises (BanVic).
 
-Só Extract + Load: os dados vão para `raw.*` do jeito que vierem. Validação e
-transformação ficam para uma etapa dbt posterior.
+Só Extract + Load: os CSVs vão para `raw.
+Fluxo: wait_for_zip (FileSensor) -> claim_zip (move p/ archive/) -> unzip_and_check
+(extrai e exige as 7 entidades) -> run_meltano (KubernetesPodOperator, `meltano run
+tap-csv target-postgres`, upsert em raw.*) -> delete_extracted_csvs (só o .zip
+permanece) -> notify_success (EmailOperator).
 
-Fluxo:
-
-  wait_for_zip           FileSensor espera {DROP}/banvic_data_{{ ds }}.zip
-        |                     (falha se não aparecer em 10 min)
-        v
-  claim_zip              move o dump -> {DROP}/archive/banvic_data_{{ ds }}.zip
-        |                     (o .zip fica retido em archive/)
-        v
-  unzip_and_check        extrai os CSVs do dia em {DROP}/archive/{{ ds }}_csvs/
-        |                     e exige as 7 entidades
-        v
-  run_meltano            KubernetesPodOperator -> `meltano run tap-csv target-postgres`
-        |                     (pod efêmero; a pasta do dia é montada em
-        |                     /project/data/csvs via subPathExpr; o tap-csv usa o
-        |                     files_def.json da imagem; carrega raw.* via upsert)
-        v
-  delete_extracted_csvs  apaga {DROP}/archive/{{ ds }}_csvs/ ; o .zip permanece
-
-Drop zone: PVC `on-premise-drop` (terraform/modules/airflow/drop_zone.tf), um
-hostPath do minikube alimentado por `minikube mount`. O scheduler roda como UID
-50000 e precisa de escrita na pasta.
-
-Agendamento `@daily`: o dump na drop zone deve ser nomeado pela data lógica UTC
-(`{{ ds }}`). `catchup=False`.
+Falhas disparam e-mail via `email_on_failure`. E-mails vão para o Mailpit (SMTP
+fake, conn `smtp_default`). Drop zone: PVC `on-premise-drop`. O dump deve ser
+nomeado pela data lógica UTC (`banvic_data_{{ ds }}.zip`). `catchup=False`.
 """
 
 from __future__ import annotations
@@ -40,6 +22,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from airflow.providers.smtp.operators.smtp import EmailOperator
 from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.sensors.filesystem import FileSensor
 from kubernetes.client import models as k8s
@@ -51,7 +34,6 @@ DROP_ZONE = "/opt/airflow/data/on_premise_drop"
 # Dumps já ingeridos ficam retidos aqui.
 ARCHIVE_DIR = f"{DROP_ZONE}/archive"
 DROP_ZONE_PVC = "on-premise-drop"
-
 # Convenção do "sistema legado": um dump por dia, nomeado pela data.
 ZIP_TEMPLATE = f"{DROP_ZONE}/banvic_data_{{{{ ds }}}}.zip"
 
@@ -131,9 +113,15 @@ def _cleanup(ds: str) -> None:
         logger.info("removido %s", out_dir)
 
 
+# Destinatário das notificações.
+ALERT_EMAIL = "banvic-oncall@banvic.local"
+
 default_args = {
     "retries": 2,
     "retry_delay": timedelta(minutes=1),
+    "email": [ALERT_EMAIL],
+    "email_on_failure": True,
+    "email_on_retry": False,
 }
 
 with DAG(
@@ -177,7 +165,6 @@ with DAG(
         namespace="airflow",
         image=MELTANO_IMAGE,
         image_pull_policy="IfNotPresent",
-        # ENTRYPOINT da imagem é `meltano`; passamos só os argumentos.
         arguments=["run", "tap-csv", "target-postgres"],
         # Data passada ao subPathExpr do volume; o Kubernetes expande $(RUN_DS).
         env_vars={"RUN_DS": "{{ ds }}"},
@@ -216,10 +203,24 @@ with DAG(
         trigger_rule="all_success",
     )
 
+    notify_success = EmailOperator(
+        task_id="notify_success",
+        to=[ALERT_EMAIL],
+        subject="[BanVic EL] run {{ ds }} OK",
+        html_content=(
+            "DAG <b>banvic_meltano_extract_load</b> concluída para "
+            "<b>{{ ds }}</b>.<br>"
+            "Entidades carregadas em <code>raw.*</code>: "
+            f"{', '.join(sorted(EXPECTED_ENTITIES))}."
+        ),
+        trigger_rule="all_success",
+    )
+
     (
         wait_for_zip
         >> claim_zip
         >> unzip_and_check
         >> run_meltano
         >> delete_extracted_csvs
+        >> notify_success
     )

@@ -50,11 +50,31 @@ resource "helm_release" "airflow" {
     yamlencode({
       executor = "LocalExecutor"
 
-      # Define a conexão `fs_default` usada pelo FileSensor. `fs://` = conn_type fs
+      # Conexões injetadas por env var (mesmo pattern do chart p/ `AIRFLOW_CONN_*`).
       env = [
+        # `fs_default` usada pelo FileSensor. `fs://` = conn_type fs
         {
           name  = "AIRFLOW_CONN_FS_DEFAULT"
           value = "fs://"
+        },
+        # `smtp_default`: aponta para o Mailpit (mailpit.tf). Sem auth, SMTP em
+        # texto puro na 1025. Formato JSON evita o footgun de bool-como-string do
+        # formato URI. Airflow 3.x lê remetente e flags TLS/SSL desta connection
+        # (não há mais seção [smtp]); o provider apache-airflow-providers-smtp já
+        # vem na imagem do chart.
+        {
+          name = "AIRFLOW_CONN_SMTP_DEFAULT"
+          value = jsonencode({
+            conn_type = "smtp"
+            host      = "mailpit.${var.namespace}.svc.cluster.local"
+            port      = 1025
+            extra = {
+              disable_tls = true
+              disable_ssl = true
+              from_email  = "banvic-airflow@banvic.local"
+              timeout     = 30
+            }
+          })
         },
       ]
 
