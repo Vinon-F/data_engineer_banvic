@@ -40,7 +40,8 @@ no PostgreSQL de destino pelo Meltano (camada `raw`). Tudo roda num Kubernetes l
 - `minikube`
 - `kubectl`
 - `terraform`
-- `psql` (opcional, só para conferir os dados)
+- `python3` (qualquer versão 3.x) com o pacote `cryptography` — só para gerar a Fernet key (passo 3)
+- `psql` (opcional, só para conferir os dados) 
 
 > Ambiente de referência: WSL2 (Ubuntu) no Windows.
 
@@ -66,6 +67,7 @@ cp terraform/secrets.auto.tfvars.example terraform/secrets.auto.tfvars
 # Edite terraform/secrets.auto.tfvars e defina:
 #   postgres_password, airflow_admin_password, airflow_fernet_key
 # Fernet key: (chave de criptorgrafia para o banco de metadados do airflow)
+# Requer o pacote cryptography: pip install cryptography  (ou: sudo apt install python3-cryptography)
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
