@@ -27,12 +27,10 @@ no PostgreSQL de destino pelo Meltano (camada `raw`). Tudo roda num Kubernetes l
 - **Ingestão**: a task `run_meltano` sobe um pod efêmero via
   `KubernetesPodOperator` e roda `meltano run tap-csv target-postgres`. Apenas a
   pasta com os CSVs do dia é montada, em modo read-only, em `/project/data/csvs`.
-<<<<<<< HEAD
   Em produção a imagem viria de um container registry por tag imutável
   (SHA/SemVer), buildada e publicada pelo CI a cada mudança no repo não via
-=======
   Em produção a imagem poderia vir de um container registry, buildada e publicada pelo CI a cada mudança no repo e não via
->>>>>>> ae69240d2bbaead9ae1589650c8551cb8a71871b
+
   `minikube image load`.
 - **Destino**: PostgreSQL 16 dedicado (namespace `postgres`, banco `banvic_dw`,
   schema `raw`), separado do banco de metadados do Airflow. As credenciais
