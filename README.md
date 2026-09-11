@@ -47,6 +47,12 @@ no PostgreSQL de destino pelo Meltano (camada `raw`). Tudo roda num Kubernetes l
 
 ## Passo a passo
 
+Clone o repositório
+
+```bash
+git clone https://github.com/Vinon-F/data_engineer_banvic.git
+```
+
 ### 1. Subir o cluster
 
 ```bash
