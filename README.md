@@ -36,7 +36,7 @@ no PostgreSQL de destino pelo Meltano (camada `raw`). Tudo roda num Kubernetes l
 
 ## Pré-requisitos
 
-- Docker
+- `Docker`
 - `minikube`
 - `kubectl`
 - `terraform`
