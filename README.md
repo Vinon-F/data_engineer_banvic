@@ -86,7 +86,7 @@ cd terraform && terraform init && terraform apply
 
 Sobe: namespace `postgres` (StatefulSet `postgres:16`, DB `banvic_dw`), namespace
 `airflow` (chart Helm, `LocalExecutor`), o `Secret meltano-postgres-credentials`, o
-PV/PVC `on-premise-drop` e o `ConfigMap` das DAGs.
+PV/PVC `on-premise-drop` e o `ConfigMap` das DAGs e `Mailpit` para simular um envio de e-mail. 
 
 ### 5. Mount da drop zone + port-forwards (um comando, mesmo terminal)
 
@@ -115,7 +115,7 @@ Acessos:
 - **PostgreSQL destino**: `psql -h localhost -p 5432 -U banvic -d banvic_dw`
   (senha = `postgres_password`).
 - **Mailpit (notificações)**: http://localhost:8025 — SMTP fake que captura os
-  e-mails da DAG (falha e sucesso); nada sai do cluster.
+  e-mails da DAG (falha e sucesso).
 
 ### 6. Rodar o pipeline
 
