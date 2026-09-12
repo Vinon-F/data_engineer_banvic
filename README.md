@@ -126,8 +126,7 @@ Comando abaixo copia o .zip original e renomeia simulando um dump diário.
 cp "banvic_data/Dados Banvic.zip" "banvic_data/banvic_data_$(date +%F).zip"
 ```
 
-Na UI do Airflow, despause e dispare a DAG **`banvic_meltano_extract_load`** (logical
-date = hoje). A DAG executa, em cadeia:
+Na UI do Airflow, despause a DAG, **`banvic_meltano_extract_load`** , ela irá disparar automaticamente. A DAG executa, em cadeia:
 
 1. `wait_for_zip` — `FileSensor` (modo `reschedule`) aguarda o `.zip` do dia (timeout 10 min).
 2. `claim_zip` — move o dump para `archive/banvic_data_<ds>.zip` (retenção permanente).
@@ -141,6 +140,8 @@ dispara um e-mail via `email_on_failure`; um run bem-sucedido dispara o e-mail d
 `notify_success`. O relay é um **Mailpit** (SMTP fake, `terraform/modules/airflow/mailpit.tf`)
 
 ### 7. Conferir os dados
+
+Utilize a ferramenta de preferência para checar os dados. No meu caso utilizei o DBeaver.
 
 ```bash
 psql -h localhost -p 5432 -U banvic -d banvic_dw -c "\dt raw.*"
