@@ -119,8 +119,8 @@ Acessos:
 
 ### 6. Rodar o pipeline
 
-Deposite o dump do dia na drop zone, nomeado pela data (UTC), exemplo: banvic_data_2026-09-09
-Comando abaixo já copia o .zip original e renomeia simulando um dump diário.
+Deposite o dump do dia na drop zone, nomeado pela data (UTC), exemplo: banvic_data_2026-09-09.
+Comando abaixo copia o .zip original e renomeia simulando um dump diário.
 
 ```bash
 cp "banvic_data/Dados Banvic.zip" "banvic_data/banvic_data_$(date +%F).zip"
@@ -163,9 +163,6 @@ chave de merge: PK nova → `INSERT`, PK existente → `UPDATE`. Consequências:
   re-execuções manuais sem duplicar dados.
 - **Incremental**: um `banvic_data_<data>.zip` novo a cada dia acumula o estado atual
   das entidades no DW, sem recriar as tabelas. Exige backfilling das dags.
-
-O *extract* relê o CSV inteiro a cada execução (o `tap-csv` não usa replication
-key/bookmark); a incrementalidade vem inteiramente do lado do *load*.
 
 **Integridade e resiliência.** As primary keys são declaradas por entidade no
 `files_def.json`; `unzip_and_check` falha cedo (`AirflowException`) se faltar qualquer
